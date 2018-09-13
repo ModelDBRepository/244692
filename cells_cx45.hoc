@@ -1,0 +1,154 @@
+create cell_a_45, cell_b_45
+
+forall {
+	L = 200
+	diam = 6
+
+	Ra = 183
+	cm = 1
+
+	insert pas
+	g_pas = 1 / 132500
+	e_pas = -50
+
+	nseg = 1	//for G-V plots; not using 51
+}
+v_init = e_pas
+
+//------------------------------------------------------
+
+objref g45[2]
+for i = 0, 1 {
+	g45[i] = new Gap45(0.5)	//Dummy Location
+}
+
+cell_a_45 g45[0].loc(0.9999) // just inside "distal" end of cell_a
+cell_b_45 g45[1].loc(0.0001) // just inside "proximal" end of cell_b
+
+objref pc
+pc = new ParallelContext()
+
+access cell_a_45
+pc.source_var(&cell_a_45.v(0.9999), pctr)
+pc.target_var(g45[1], &g45[1].vgap, pctr)
+pctr = pctr + 1
+
+access cell_b_45
+pc.source_var(&cell_b_45.v(0.0001), pctr)
+pc.target_var(g45[0], &g45[0].vgap, pctr)
+pctr = pctr + 1
+
+{ pc.setup_transfer() }
+ParallelComputeTool[0].nthread(1)
+cvode.cache_efficient(1)
+
+//------------------------------------------------------
+
+objref vbox_45, hbox1_45, hbox2_45
+objref graph_v_45, graph_i_45, g_iv_45, g_gv_45
+
+graph_v_45 = new Graph(0)
+graph_v_45.exec_menu("Keep Lines")
+addplot(graph_v_45,0)
+graph_v_45.addexpr("cell_a_45.v(0.5)", 1, 2, 100, 100)
+
+graph_i_45 = new Graph(0)
+graph_i_45.exec_menu("Keep Lines")
+addplot(graph_i_45,0)
+graph_i_45.addexpr("g45[0].i", 5, 2, 100, 100)
+//graph_i_45.addexpr("g45[1].i", 5, 2)
+
+g_iv_45 = new Graph(0)
+g_gv_45 = new Graph(0)
+
+vbox_45 = new VBox()	//***** VBox
+vbox_45.intercept(1)
+
+hbox1_45 = new HBox()	//----- HBox1
+hbox1_45.intercept(1)
+
+graph_v_45.view(0, -170, 16000, 200, 600, 45, 600, 450)
+graph_i_45.view(0, -6, 16000, 12, 1200, 45, 600, 450)
+
+hbox1_45.intercept(0)
+hbox1_45.map()			//----- HBox1
+
+hbox2_45 = new HBox()	//----- HBox2
+hbox2_45.intercept(1)
+
+g_iv_45.view(-100, -6, 200, 12, 600, 45, 600, 450)
+g_gv_45.view(-100, 0, 200, 180, 1200, 45, 600, 450)
+
+hbox2_45.intercept(0)
+hbox2_45.map()			//----- HBox2
+
+vbox_45.intercept(0)
+vbox_45.map()			//***** VBox
+//------------------------------------------------------
+
+objref stim_a_45
+cell_a_45 stim_a_45 = new VClamp(0.5)
+stim_a_45.amp[0] = -50
+
+stim_a_45.amp[2] = -50
+stim_a_45.dur[0] = 50
+stim_a_45.dur[1] = 15000
+stim_a_45.dur[2] = 500
+
+//Stimulation stops before return to rest level
+tstop= stim_a_45.dur[0]+stim_a_45.dur[1]
+
+objref stim_b_45
+cell_b_45 stim_b_45 = new VClamp (0.5)
+stim_b_45.amp[0] = -50
+stim_b_45.amp[1] = -50
+stim_b_45.amp[2] = -50
+stim_b_45.dur[0] = 50
+stim_b_45.dur[1] = 15000
+stim_b_45.dur[2] = 500
+
+//------------------------------------------------------
+
+objref rec_i_45, rec_g_45, vec_i_45, vec_g_45, vec_g_45_inst, vec_v_45
+
+rec_i_45 = new Vector()
+rec_g_45 = new Vector()
+rec_i_45.record(&g45[0].i)
+rec_g_45.record (&g45[0].g)
+
+vec_i_45 = new Vector()
+vec_g_45 = new Vector()
+vec_g_45_inst = new Vector()
+vec_v_45 = new Vector()
+
+//------------------------------------------------------
+
+for(i=-152.5; i<=52.5; i=i+5) {
+	stim_a_45.amp[1] = i
+	print "Clamp Level= ", i
+	run()
+
+	vec_g_45.append(rec_g_45.min())
+	vec_i_45.append(rec_i_45.x(rec_i_45.size()-1))
+	vec_v_45.append ((stim_a_45.amp[1]- stim_b_45.amp[1]))
+
+	//Evaluate Instantaneous Conductance
+	if ( (stim_a_45.amp[1]-stim_b_45.amp[1]) < 0 ) {
+		vec_g_45_inst.append( 1000 * rec_i_45.min() / (stim_a_45.amp[1]- stim_b_45.amp[1]))
+	} else {
+		vec_g_45_inst.append( 1000 * rec_i_45.max() / (stim_a_45.amp[1]- stim_b_45.amp[1]))
+	}
+}
+
+//------------------------------------------------------
+
+vec_i_45.line(g_iv_45, vec_v_45, 2,2)
+g_iv_45.exec_menu("View = plot")
+
+vec_g_45.line(g_gv_45, vec_v_45, 3, 2)
+vec_g_45_inst.line(g_gv_45, vec_v_45, 2, 2)
+g_gv_45.mark(0,0,"O",1)
+g_gv_45.exec_menu("View = plot")
+
+graph_v_45.exec_menu("View = plot")
+graph_i_45.exec_menu("View = plot")

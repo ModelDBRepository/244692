@@ -1,0 +1,13 @@
+{load_file("nrngui.hoc")}
+load_file("parcom.hoc")	//For Parallel Gap Junctions
+
+nrncontrolmenu()
+steps_per_ms = 3.33
+setdt()
+dt= 0.3
+pctr = 0
+
+// Load the required gap junction subtype(s) below
+load_file("cells_cx40.hoc")
+// load_file("cells_cx43.hoc")
+// load_file("cells_cx45.hoc")
